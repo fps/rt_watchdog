@@ -4,7 +4,7 @@
 # echo $$ >> /tmp/unfifo_log
 
 # we only change the scheduling policy of non kernel threads.
-# which are those not havong brackets in the "ps -eL -o pid,command" output
+# which are those not having brackets in the "ps -eL -o pid,command" output
 for i in $( ps -eLF | grep -v ' \[.*\]$' | grep -v PID | awk '{print $4}' );
 do
 	if [ "$i" != "$1" -a "$i" != "$2"  -a "$i" != "$$" ]

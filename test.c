@@ -14,7 +14,6 @@ int main() {
 	params.sched_priority = 1;
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &params);
 
-
 	gettimeofday(&tv,0);
 	startsec = tv.tv_sec;
 #if 0

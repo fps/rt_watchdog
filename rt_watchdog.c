@@ -210,7 +210,7 @@ int main()
 			   scheduling policy change */
 			sprintf(unfifo_cmd, "unfifo_stuff.sh %i %i", lp_tid, hp_tid);
 			syslog(LOG_INFO, "unfifo command:");
-			syslog(LOG_INFO, unfifo_cmd);
+			syslog(LOG_INFO, "%s", unfifo_cmd);
 
 			if (system(unfifo_cmd) == -1) {
 				syslog(LOG_INFO, "unfifo command failed");
