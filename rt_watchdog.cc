@@ -24,7 +24,7 @@ void *waker(void *)
       exit(1);
     }
 
-    std::cout << "Waking.\n";
+    // std::cout << "Waking.\n";
 
     if (0 != pthread_cond_signal(&cond))
     {
@@ -42,25 +42,38 @@ int main(int argc, char *argv[])
   uint32_t waker_period;
   uint32_t waiter_timeout;
 
-  namespace po = boost::program_options;
-  po::options_description options_description("Allowed options");
-  options_description.add_options()
-    ("help", "Show this help text")
-    ("command", po::value<std::string>(&command)->default_value("bash -c \"for n in $(ps -eLF | grep -v '\\[.*\\]$' | grep -v rt_watchdog | awk '{print $4}'); do chrt -o -p $n; done\""), "The command to run in case of a timeout")
-    ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
-    ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
-  ;
+  uint32_t waker_priority;
+  uint32_t waiter_priority;
 
-  po::variables_map variables_map;
-  po::store(po::parse_command_line(argc, argv, options_description), variables_map);
-
-  if (variables_map.count("help"))
+  try
   {
-    std::cout << options_description << "\n";
-    exit(0);
-  }
+    namespace po = boost::program_options;
+    po::options_description options_description("Allowed options");
+    options_description.add_options()
+      ("help,h", "Show this help text")
+      ("command", po::value<std::string>(&command)->default_value("bash -c \"echo rt_watchdog timed out. Changing thread priorities | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk '$2 >= 55' | awk '$2 <= 85' | awk '{print $1}'); do chrt -o -p $n; done\""), "The command to run in case of a timeout")
+      ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
+      ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
+      ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(0), "The waker priority (SCHED_FIFO)")
+      ("waiter-priority", po::value<uint32_t>(&waiter_priority)->default_value(90), "The waiter priority (SCHED_FIFO)")
+    ;
   
-  po::notify(variables_map);
+    po::variables_map variables_map;
+    po::store(po::parse_command_line(argc, argv, options_description), variables_map);
+  
+    if (variables_map.count("help"))
+    {
+      std::cout << options_description << "\n";
+      exit(0);
+    }
+    
+    po::notify(variables_map);
+  }
+  catch(const std::exception &e)
+  {
+    std::cout << "Error: " << e.what() << "\n";
+    exit(1);
+  }
 
   waker_timeout.tv_sec = waker_period;
 
@@ -91,7 +104,7 @@ int main(int argc, char *argv[])
     switch(wait_res)
     {
       case 0:
-        std::cout << "Woken.\n";
+        // std::cout << "Woken.\n";
         break;
       case ETIMEDOUT:
         std::cout << "Timeout.\n";
