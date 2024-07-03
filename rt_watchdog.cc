@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
   po::options_description options_description("Allowed options");
   options_description.add_options()
     ("help", "Show this help text")
-    ("command", po::value<std::string>(&command)->default_value("bash -c \"echo hello\""), "The command to run in case of a timeout")
+    ("command", po::value<std::string>(&command)->default_value("bash -c \"for n in $(ps -eLF | grep -v '\\[.*\\]$' | grep -v rt_watchdog | awk '{print $4}'); do chrt -o -p $n; done\""), "The command to run in case of a timeout")
     ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
     ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
   ;
@@ -71,8 +71,6 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  bool first_wakeup = true;
-  timespec last_wakeup;
   while(true)
   {
     if (0 != pthread_mutex_lock(&mutex))
