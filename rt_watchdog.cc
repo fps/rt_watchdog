@@ -14,8 +14,17 @@ pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 timespec waker_timeout{5, 0};
 
+uint32_t waker_priority;
+
 void *waker(void *)
 {
+  sched_param param{(int)waker_priority};
+  if (0 != pthread_setschedparam(pthread_self(), SCHED_FIFO, &param))
+  {
+    std::cout << "Failed to set waker priority. Exiting.\n";
+    exit(1);
+  }
+
   while(true)
   {
     if (-1 == nanosleep(&waker_timeout, 0))
@@ -42,7 +51,6 @@ int main(int argc, char *argv[])
   uint32_t waker_period;
   uint32_t waiter_timeout;
 
-  uint32_t waker_priority;
   uint32_t waiter_priority;
 
   try
@@ -54,8 +62,8 @@ int main(int argc, char *argv[])
       ("command", po::value<std::string>(&command)->default_value("bash -c \"echo rt_watchdog timed out. Changing thread priorities | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk '$2 >= 55' | awk '$2 <= 85' | awk '{print $1}'); do chrt -o -p $n; done\""), "The command to run in case of a timeout")
       ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
       ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
-      ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(0), "The waker priority (SCHED_FIFO)")
-      ("waiter-priority", po::value<uint32_t>(&waiter_priority)->default_value(90), "The waiter priority (SCHED_FIFO)")
+      ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(1), "The waker priority (SCHED_FIFO)")
+      ("waiter-priority", po::value<uint32_t>(&waiter_priority)->default_value(95), "The waiter priority (SCHED_FIFO)")
     ;
   
     po::variables_map variables_map;
@@ -81,6 +89,13 @@ int main(int argc, char *argv[])
   if (0 != pthread_create(&waker_thread, 0, waker, 0))
   {
     std::cout << "Failed to create waker thread. Exiting.\n";
+    exit(1);
+  }
+
+  sched_param param{(int)waiter_priority};
+  if (0 != pthread_setschedparam(pthread_self(), SCHED_FIFO, &param))
+  {
+    std::cout << "Failed to set waker priority. Exiting.\n";
     exit(1);
   }
 
