@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <sys/time.h>
 
+#include <cstdlib>
+
 #include <iostream>
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -36,6 +38,32 @@ void *waker(void *)
 
 int main(int argc, char *argv[])
 {
+  std::string command;
+  uint32_t waker_period;
+  uint32_t waiter_timeout;
+
+  namespace po = boost::program_options;
+  po::options_description options_description("Allowed options");
+  options_description.add_options()
+    ("help", "Show this help text")
+    ("command", po::value<std::string>(&command)->default_value("bash -c \"echo hello\""), "The command to run in case of a timeout")
+    ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
+    ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
+  ;
+
+  po::variables_map variables_map;
+  po::store(po::parse_command_line(argc, argv, options_description), variables_map);
+
+  if (variables_map.count("help"))
+  {
+    std::cout << options_description << "\n";
+    exit(0);
+  }
+  
+  po::notify(variables_map);
+
+  waker_timeout.tv_sec = waker_period;
+
   pthread_t waker_thread;
   if (0 != pthread_create(&waker_thread, 0, waker, 0))
   {
@@ -60,7 +88,7 @@ int main(int argc, char *argv[])
       exit(1);
     }
 
-    timespec timeout{current_time.tv_sec + 1, current_time.tv_usec * 1000};
+    timespec timeout{current_time.tv_sec + waiter_timeout, current_time.tv_usec * 1000};
     int wait_res = pthread_cond_timedwait(&cond, &mutex, &timeout);
     switch(wait_res)
     {
@@ -69,6 +97,11 @@ int main(int argc, char *argv[])
         break;
       case ETIMEDOUT:
         std::cout << "Timeout.\n";
+        if(-1 == system(command.c_str()))
+        {
+          std::cout << "Failed to run command: " << strerror(errno) << ". Exiting.\n";
+          exit(1);
+        }
         break;
       default:
         std::cout << "Failed to wait on condition variable. Exiting.\n";
