@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     po::options_description options_description("Allowed options");
     options_description.add_options()
       ("help,h", "Show this help text")
-      ("command", po::value<std::string>(&command)->default_value("bash -c $'echo rt_watchdog timed out. Changing thread priorities | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk \\'$2 >= 55\\' | awk \\'$2 <= 85\\' | awk \\'{print $1}\\'); do chrt -o -p 0 $n; done'"), "The command to run in case of a timeout")
+      ("command", po::value<std::string>(&command)->default_value("bash -c $'echo rt_watchdog timed out. Changing thread scheduling classes to SCHED_OTHER | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk \\'$2 >= 55\\' | awk \\'$2 <= 85\\' | awk \\'{print $1}\\'); do chrt -o -p 0 $n; done'"), "The command to run in case of a timeout")
       ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
       ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
       ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(1), "The waker priority (SCHED_FIFO)")
