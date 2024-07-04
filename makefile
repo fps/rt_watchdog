@@ -3,4 +3,4 @@ LDFLAGS = -lboost_program_options
 
 .PHONY: all
 
-all: rt_watchdog
+all: rt_watchdog cpuhog
