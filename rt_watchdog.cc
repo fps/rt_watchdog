@@ -113,12 +113,21 @@ int main(int argc, char *argv[])
     uint32_t value = __atomic_load_n(&sentinel, __ATOMIC_SEQ_CST);
     if (value == 0)
     {
+      /*
+      timespec ts;
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      std::cout << ts.tv_sec << " " << ts.tv_nsec << "\n";
+      */
       std::cout << "Waker seems to not have run in a while. Executing command: \"" << command << "\"\n";
       if(-1 == system(command.c_str()))
       {
         std::cout << "Failed to run command: " << strerror(errno) << ". Exiting.\n";
         exit(1);
       }
+      /*
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      std::cout << ts.tv_sec << " " << ts.tv_nsec << "\n";
+      */
     }
   }
 
