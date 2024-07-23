@@ -18,11 +18,14 @@ uint32_t waker_priority;
 
 void *waker(void *)
 {
-  sched_param param{(int)waker_priority};
-  if (0 != pthread_setschedparam(pthread_self(), SCHED_FIFO, &param))
+  if (0 != waker_priority)
   {
-    std::cout << "Failed to set waker priority. Exiting.\n";
-    exit(1);
+    sched_param param{(int)waker_priority};
+    if (0 != pthread_setschedparam(pthread_self(), SCHED_FIFO, &param))
+    {
+      std::cout << "Failed to set waker priority. Exiting.\n";
+      exit(1);
+    }
   }
 
   while(true)
@@ -62,7 +65,7 @@ int main(int argc, char *argv[])
       ("command", po::value<std::string>(&command)->default_value("bash -c $'echo rt_watchdog timed out. Changing thread scheduling classes to SCHED_OTHER | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk \\'$2 >= 55\\' | awk \\'$2 <= 85\\' | awk \\'{print $1}\\'); do chrt -o -p 0 $n; done'"), "The command to run in case of a timeout")
       ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
       ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
-      ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(1), "The waker priority (SCHED_FIFO)")
+      ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(0), "The waker priority (SCHED_FIFO). If set to 0 SCHED_OTHER is used")
       ("waiter-priority", po::value<uint32_t>(&waiter_priority)->default_value(95), "The waiter priority (SCHED_FIFO)")
     ;
   

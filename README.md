@@ -10,3 +10,17 @@ So as long as you put your potentially locking up `SCHED_FIFO` programs to a pri
 # Requirements
 
 Just some core utilities like `chrt`, `awk`, `grep` and `bash`, and additionally a C++ compiler, `gnumak` and `boost-program-options`
+
+# Interface:
+
+```console
+Allowed options:
+  -h [ --help ]                         Show this help text
+  --command arg (=bash -c $'echo rt_watchdog timed out. Changing thread scheduling classes to SCHED_OTHER | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk \'$2 >= 55\' | awk \'$2 <= 85\' | awk \'{print $1}\'); do chrt -o -p 0 $n; done')
+                                        The command to run in case of a timeout
+  --waker-period arg (=1)               The waker period (seconds)
+  --waiter-timeout arg (=5)             The waiter timeout (seconds)
+  --waker-priority arg (=0)             The waker priority (SCHED_FIFO). If set
+                                        to 0 SCHED_OTHER is used
+  --waiter-priority arg (=95)           The waiter priority (SCHED_FIFO)
+```
