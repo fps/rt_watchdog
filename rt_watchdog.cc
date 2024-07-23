@@ -9,11 +9,12 @@
 
 #include <iostream>
 
+uint32_t sentinel;
+
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
-timespec waker_timeout{5, 0};
-
+timespec waker_period_timespec{0, 0};
 uint32_t waker_priority;
 
 void *waker(void *)
@@ -30,19 +31,12 @@ void *waker(void *)
 
   while(true)
   {
-    if (-1 == nanosleep(&waker_timeout, 0))
+    __atomic_add_fetch(&sentinel, 1, __ATOMIC_SEQ_CST);
+    if (-1 == nanosleep(&waker_period_timespec, 0))
     {
-      std::cout << "Failed to sleep: " << strerror(errno) << ". Exiting.\n";
+      std::cout << "Waker failed to sleep: " << strerror(errno) << ". Exiting.\n"; 
       exit(1);
-    }
-
-    // std::cout << "Waking.\n";
-
-    if (0 != pthread_cond_signal(&cond))
-    {
-      std::cout << "Failed to signal condition variable. Exiting.\n";
-      exit(1);
-    }
+    }  
   }
 
   return 0;
@@ -52,8 +46,7 @@ int main(int argc, char *argv[])
 {
   std::string command;
   uint32_t waker_period;
-  uint32_t waiter_timeout;
-
+  uint32_t waiter_period;
   uint32_t waiter_priority;
 
   try
@@ -64,7 +57,7 @@ int main(int argc, char *argv[])
       ("help,h", "Show this help text")
       ("command", po::value<std::string>(&command)->default_value("bash -c $'echo rt_watchdog timed out. Changing thread scheduling classes to SCHED_OTHER | wall; for n in $(ps -eL -o pid=,rtprio= | grep -v - | awk \\'$2 >= 55\\' | awk \\'$2 <= 85\\' | awk \\'{print $1}\\'); do chrt -o -p 0 $n; done'"), "The command to run in case of a timeout")
       ("waker-period", po::value<uint32_t>(&waker_period)->default_value(1), "The waker period (seconds)")
-      ("waiter-timeout", po::value<uint32_t>(&waiter_timeout)->default_value(5), "The waiter timeout (seconds)")
+      ("waiter-period", po::value<uint32_t>(&waiter_period)->default_value(5), "The waiter timeout (seconds)")
       ("waker-priority", po::value<uint32_t>(&waker_priority)->default_value(0), "The waker priority (SCHED_FIFO). If set to 0 SCHED_OTHER is used")
       ("waiter-priority", po::value<uint32_t>(&waiter_priority)->default_value(95), "The waiter priority (SCHED_FIFO)")
     ;
@@ -85,8 +78,14 @@ int main(int argc, char *argv[])
     std::cout << "Error: " << e.what() << "\n";
     exit(1);
   }
+  
+  timespec waiter_period_timespec{0, 0};
 
-  waker_timeout.tv_sec = waker_period;
+  waker_period_timespec.tv_sec = waker_period;
+  waiter_period_timespec.tv_sec = waiter_period;
+
+  __atomic_store_n(&sentinel, 0, __ATOMIC_SEQ_CST);
+
 
   pthread_t waker_thread;
   if (0 != pthread_create(&waker_thread, 0, waker, 0))
@@ -104,43 +103,22 @@ int main(int argc, char *argv[])
 
   while(true)
   {
-    if (0 != pthread_mutex_lock(&mutex))
+    __atomic_store_n(&sentinel, 0, __ATOMIC_SEQ_CST);
+    if (-1 == nanosleep(&waiter_period_timespec, 0))
     {
-      std::cout << "Failed to lock mutex. Exiting.\n";
+      std::cout << "Waiter failed to sleep: " << strerror(errno) << "\n";
       exit(1);
     }
-
-    timeval current_time;
-    if (0 != gettimeofday(&current_time, 0))
+    
+    uint32_t value = __atomic_load_n(&sentinel, __ATOMIC_SEQ_CST);
+    if (value == 0)
     {
-      std::cout << "Failed to get current time. Exiting.\n";
-      exit(1);
-    }
-
-    timespec timeout{current_time.tv_sec + waiter_timeout, current_time.tv_usec * 1000};
-    int wait_res = pthread_cond_timedwait(&cond, &mutex, &timeout);
-    switch(wait_res)
-    {
-      case 0:
-        // std::cout << "Woken.\n";
-        break;
-      case ETIMEDOUT:
-        std::cout << "Timeout.\n";
-        if(-1 == system(command.c_str()))
-        {
-          std::cout << "Failed to run command: " << strerror(errno) << ". Exiting.\n";
-          exit(1);
-        }
-        break;
-      default:
-        std::cout << "Failed to wait on condition variable. Exiting.\n";
+      std::cout << "Waker seems to not have run in a while. Executing command: \"" << command << "\"\n";
+      if(-1 == system(command.c_str()))
+      {
+        std::cout << "Failed to run command: " << strerror(errno) << ". Exiting.\n";
         exit(1);
-    }
-
-    if (0 != pthread_mutex_unlock(&mutex))
-    {
-      std::cout << "Failed to unlock mutex. Exiting.\n";
-      exit(1);
+      }
     }
   }
 
